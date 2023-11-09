@@ -378,6 +378,10 @@ def process_paragraphs(paragraphs, stop_words):
     stemmer = PorterStemmer()  # Using the modified stemmer
 
     for paragraph in paragraphs:
+        # Get rid of all the html tags
+        while "<br /><br />" in paragraph:
+            paragraph = paragraph.replace("<br /><br />", "")
+        
         # Tokenize, remove punctuation and numbers, convert to lower case
         words = paragraph.translate(str.maketrans('', '', string.punctuation + string.digits)).lower().split()
 
