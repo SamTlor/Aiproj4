@@ -1,37 +1,8 @@
 
 import string
+import pandas as pd
+import numpy as np
 from collections import Counter
-#!/usr/bin/env python
-
-"""Porter Stemming Algorithm
-This is the Porter stemming algorithm, ported to Python from the
-version coded up in ANSI C by the author. It may be be regarded
-as canonical, in that it follows the algorithm presented in
-
-Porter, 1980, An algorithm for suffix stripping, Program, Vol. 14)
-no. 3, pp 130-137)
-
-only differing from it at the points maked --DEPARTURE-- below.
-
-See also http://www.tartarus.org/~martin/PorterStemmer
-
-The algorithm as described in the paper could be exactly replicated
-by adjusting the points of DEPARTURE, but this is barely necessary)
-because (a) the points of DEPARTURE are definitely improvements, and
-(b) no encoding of the Porter stemmer I have seen is anything like
-as exact as this version, even with the points of DEPARTURE!
-
-Vivake Gupta (v@nano.com)
-
-Release 1: January 2001
-
-Further adjustments by Santiago Bruno (bananabruno@gmail.com)
-to allow word input not restricted to one word per line, leading
-to:
-
-release 2: July 2008
-"""
-
 import sys
 
 class PorterStemmer:
@@ -396,12 +367,99 @@ def process_paragraphs(paragraphs, stop_words):
 
     return processed_paragraphs
 
+
+
+
+class FCAN:
+    def __init__(self, threshold = 0.5, alpha = 0.1):
+        self.threshold = threshold
+        self.alpha = alpha
+        self.clusters = []
+        
+        
+        
+    def calculate_distance(self, pattern, cluster):
+        return np.linalg.norm(pattern - cluster)
+
+    def find_closest_cluster(self, pattern):
+        if not self.clusters:
+            return None, float('inf')
+
+        min_distance = float('inf')
+        closest_cluster = None
+
+        for cluster in self.clusters:
+            distance = self.calculate_distance(pattern, cluster["weights"])
+            if distance < min_distance:
+                min_distance = distance
+                closest_cluster = cluster
+
+        return closest_cluster, min_distance
+
+    def update_cluster_weights(self, closest_cluster, pattern):
+        closest_cluster["weights"] = (closest_cluster["m"] * closest_cluster["weights"] +
+                                      self.alpha * pattern) / (closest_cluster["m"] + 1)
+        closest_cluster["m"] += 1
+
+    def add_new_cluster(self, pattern):
+        new_cluster = {"weights": pattern, "m": 1}
+        self.clusters.append(new_cluster)
+
+    def process_patterns(self, data):
+        for _, row in data.iterrows():
+            pattern = row.values
+            closest_cluster, min_distance = self.find_closest_cluster(pattern)
+
+            if closest_cluster is None or min_distance > self.threshold:
+                self.add_new_cluster(pattern)
+            else:
+                self.update_cluster_weights(closest_cluster, pattern)
 def main():
     try:
         stop_words = read_file_lines('Project4_stop_words.txt')
         paragraphs = read_file_lines('Project4_paragraphs.txt')
         processed_data = process_paragraphs(paragraphs, stop_words)
-        print(processed_data)
+        for i in processed_data:
+            print(i)
+        
+        # Flatten the list of lists to get all unique words
+        all_words = list(set(word for sublist in processed_data for word in sublist))
+
+        # Create a DataFrame with rows and columns
+        df = pd.DataFrame(index=range(len(processed_data)), columns=all_words)
+
+        # Fill the DataFrame with counts
+        for i, sublist in enumerate(processed_data):
+            for word in sublist:
+                df.at[i, word] = sublist[word]
+                            
+        #fill nan values with 0
+        df = df.fillna(0)
+        print(df)
+        
+        
+        
+        
+        #running the algorithm
+        fcan = FCAN(threshold = 25, alpha = 0.3)
+        fcan.process_patterns(df)
+
+        for i, cluster in enumerate(fcan.clusters):
+            print(f"Cluster {i + 1}: {cluster['weights']}")
+        
+        
+        
+        #accuracy determined by frequency of stem words
+        #take average accuracy of each cluster and average accuracy of all cluster
+        #to determin if need to increase/decrease number of clusters
+        #(desired - output ) / (desired )
+        
+        
+        
+        
+        
+        
+                
     except Exception as e:
         print(f"An error occurred: {e}")
 
